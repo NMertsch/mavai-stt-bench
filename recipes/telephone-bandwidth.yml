@@ -1,0 +1,9 @@
+id: telephone-bandwidth
+description: Simulates a low-fidelity analogue telephone channel.
+steps:
+  - type: highpass
+    frequencyHz: 300
+  - type: lowpass
+    frequencyHz: 3400
+  - type: resample
+    sampleRateHz: 8000

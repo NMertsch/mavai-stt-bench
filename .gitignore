@@ -1,0 +1,69 @@
+### Gradle ###
+.gradle
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+.kotlin
+
+### Java ###
+*.class
+*.log
+hs_err_pid*
+replay_pid*
+
+### IntelliJ IDEA ###
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+### Eclipse ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+### VS Code ###
+.vscode/
+
+### Mac OS ###
+.DS_Store
+
+### Claude ###
+# CLAUDE.md is a gitignored relative symlink to the orchestrator's
+# .claude-submodules/ — never tracked in this public repo.
+/CLAUDE.md
+.claude/settings.local.json
+
+### STT benchmark — generated / derived artefacts ###
+# Generated audio is reproducible from corpus × recipes.
+/generated-audio/**
+!/generated-audio/README.md
+# PUnit explore results are reproducible from the benchmark run.
+/results/**
+!/results/README.md
+!/results/explore/
+!/results/explore/README.md
+# Reports are reproducible from the results.
+/reports/**
+!/reports/README.md
+
+### Secrets / API keys ###
+# Never commit provider credentials.
+*.env
+.env
+.env.*
+secrets.properties
+**/credentials.json
+**/*-api-key*
+**/*.pem

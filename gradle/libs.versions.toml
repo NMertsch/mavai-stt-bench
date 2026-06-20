@@ -1,0 +1,43 @@
+# Version catalog for mavai-stt-bench.
+#
+# JUnit 6 is pinned deliberately and explicitly here: validating that PUnit
+# operates correctly on top of JUnit 6 is a stated objective of this project
+# (see README, "JUnit 6 compatibility validation"). Do NOT downgrade this to
+# the JUnit 5 line used by sibling mavai projects.
+
+[versions]
+junit = "6.0.0"
+punit = "0.9.0"
+outcome = "1.0.0-alpha1"
+jackson = "2.21.4"
+assertj = "3.27.7"
+log4j = "2.26.0"
+jspecify = "1.0.0"
+
+[libraries]
+# PUnit — author-facing API (ServiceContract, Sampling, criteria), engine,
+# statistics. JUnit-free on the main classpath.
+punit-core = { module = "org.mavai:punit-core", version.ref = "punit" }
+# PUnit reporting — auto-registers its verdict sink on the test classpath.
+punit-report = { module = "org.mavai:punit-report", version.ref = "punit" }
+
+# Outcome — the mavai expected-failure result type.
+outcome = { module = "org.mavai:outcome", version.ref = "outcome" }
+
+# Jackson — JSON + YAML parsing for recipes and explore-result files.
+jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
+jackson-yaml = { module = "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml", version.ref = "jackson" }
+
+# Nullability annotations.
+jspecify = { module = "org.jspecify:jspecify", version.ref = "jspecify" }
+
+# Logging stack — aligned with punitexamples (Log4j2 over SLF4J).
+log4j-api = { module = "org.apache.logging.log4j:log4j-api", version.ref = "log4j" }
+log4j-core = { module = "org.apache.logging.log4j:log4j-core", version.ref = "log4j" }
+log4j-slf4j2 = { module = "org.apache.logging.log4j:log4j-slf4j2-impl", version.ref = "log4j" }
+
+# Test stack.
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }

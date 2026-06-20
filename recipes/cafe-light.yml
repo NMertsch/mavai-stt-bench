@@ -1,0 +1,11 @@
+id: cafe-light
+description: >
+  Simulates a quiet café: low-level background chatter and ambience mixed under
+  the speech at a high signal-to-noise ratio. A mild degradation that most
+  competent STT services should still handle well.
+steps:
+  - type: mixNoise
+    profile: cafe
+    snrDb: 18
+  - type: gain
+    db: -1

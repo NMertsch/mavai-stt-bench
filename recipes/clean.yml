@@ -1,0 +1,6 @@
+id: clean
+description: >
+  Pass-through baseline. Applies no transformation, so the generated audio is
+  identical to the source corpus clip. Gives every benchmark a control column
+  against which the degrading recipes can be compared.
+steps: []

@@ -1,0 +1,13 @@
+id: cafe-heavy
+description: >
+  Simulates a busy café: loud overlapping chatter, clatter, and ambience mixed
+  close to the speech level. A stress test that separates robust STT services
+  from fragile ones.
+steps:
+  - type: mixNoise
+    profile: cafe
+    snrDb: 5
+  - type: reverb
+    roomSize: 0.4
+  - type: gain
+    db: -2
