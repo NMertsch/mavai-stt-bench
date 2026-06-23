@@ -34,7 +34,11 @@ steps:
 | `cafe-light.yml`           | quiet café, high signal-to-noise ratio     |
 | `cafe-heavy.yml`           | busy café, low signal-to-noise ratio       |
 
-The recipe **model** (`org.mavai.sttbench.recipe.Recipe`,
-`RecipeStep`, `RecipeLoader`) parses these files. The **engine** that executes
-the steps is an intentional gap — see the repository README, *How to add a
-recipe*, and the `generateAudioVariants` Gradle task.
+The recipe **model** (`org.mavai.sttbench.recipe.AudioRecipe`,
+`AudioRecipeStep`, `AudioRecipeLoader`) parses these files. The **engine** that
+executes the steps is `org.mavai.sttbench.audio` (built on the JDK's Java Sound,
+no third-party audio dependency), driven by the `generateAudioVariants` Gradle
+task. It implements `gain`, `highpass`, `lowpass` and `resample` — so `clean`
+and `telephone-bandwidth` generate fully — and reports `mixNoise` and `reverb`
+as the steps left to implement. Adding one is a step in `AudioTransforms.forStep`
+(see the repository README, *How to add a recipe*).

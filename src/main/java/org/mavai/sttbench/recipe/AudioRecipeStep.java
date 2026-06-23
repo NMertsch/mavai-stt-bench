@@ -7,7 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * One transformation step within a {@link Recipe}.
+ * One transformation step within an {@link AudioRecipe}.
  *
  * <p>Every step has a {@code type} (e.g. {@code highpass}, {@code lowpass},
  * {@code resample}); the remaining keys are step-specific parameters captured
@@ -15,13 +15,14 @@ import java.util.Map;
  * add new step types without changing this class — the audio-generation stage
  * is the place that interprets them.
  *
- * <p><strong>Skeletal.</strong> Parameters are untyped on purpose: no step
- * type is executed yet (see {@code generateAudioVariants}). A Hackergarten
- * session can introduce a typed step hierarchy once the transform engine
- * exists.
+ * <p>The transform engine ({@code org.mavai.sttbench.audio.AudioTransforms})
+ * interprets these: it implements {@code gain}, {@code highpass},
+ * {@code lowpass} and {@code resample}, and treats {@code mixNoise}/{@code reverb}
+ * (and any unknown type) as expected failures to be filled in. Introducing a
+ * typed step hierarchy is a sensible Hackergarten follow-up.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public final class RecipeStep {
+public final class AudioRecipeStep {
 
     private String type;
     private final Map<String, Object> parameters = new LinkedHashMap<>();

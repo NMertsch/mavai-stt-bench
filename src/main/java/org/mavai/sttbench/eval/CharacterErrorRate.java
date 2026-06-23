@@ -8,9 +8,12 @@ package org.mavai.sttbench.eval;
  * spelling slips and more informative for languages without clear word
  * boundaries. Lower is better.
  *
- * <p><strong>Skeletal.</strong> Operates on the normalised string with
- * spaces retained. As with WER, the Levenshtein routine is unoptimised and
- * carries no S/I/D breakdown.
+ * <p><strong>Not implemented yet — this is a Hackergarten task.</strong> The
+ * behaviour you are implementing towards is pinned by the (currently
+ * {@code @Disabled}) spec in {@code CharacterErrorRateTest}. Enable that test,
+ * then make it green. It is the character-level twin of {@link WordErrorRate}:
+ * normalise both sides, compute Levenshtein over the characters of the
+ * normalised string (spaces retained), and divide by the reference length.
  */
 public final class CharacterErrorRate {
 
@@ -20,37 +23,18 @@ public final class CharacterErrorRate {
     /**
      * Computes CER of {@code hypothesis} against {@code reference}.
      *
+     * <p>Contract the spec test asserts: {@code 0.0} for a perfect match (after
+     * normalisation), {@code 0.0} when both sides normalise to empty, and
+     * {@code 1.0} when the reference is empty but the hypothesis is not. A
+     * single character edit against an {@code n}-character reference scores
+     * {@code 1.0 / n}.
+     *
      * @param reference  the ground-truth transcript
      * @param hypothesis the provider's transcript
-     * @return the CER in {@code [0, ∞)}; {@code 0.0} for a perfect match,
-     *     and {@code 0.0} when both normalise to empty
+     * @return the CER in {@code [0, ∞)}; {@code 0.0} for a perfect match
      */
     public static double compute(String reference, String hypothesis) {
-        String ref = TranscriptNormaliser.normalise(reference);
-        String hyp = TranscriptNormaliser.normalise(hypothesis);
-        if (ref.isEmpty()) {
-            return hyp.isEmpty() ? 0.0 : 1.0;
-        }
-        int distance = levenshtein(ref, hyp);
-        return (double) distance / ref.length();
-    }
-
-    private static int levenshtein(String a, String b) {
-        int[][] d = new int[a.length() + 1][b.length() + 1];
-        for (int i = 0; i <= a.length(); i++) {
-            d[i][0] = i;
-        }
-        for (int j = 0; j <= b.length(); j++) {
-            d[0][j] = j;
-        }
-        for (int i = 1; i <= a.length(); i++) {
-            for (int j = 1; j <= b.length(); j++) {
-                int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
-                d[i][j] = Math.min(
-                        Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1),
-                        d[i - 1][j - 1] + cost);
-            }
-        }
-        return d[a.length()][b.length()];
+        throw new UnsupportedOperationException(
+                "Hackergarten: implement Character Error Rate — see CharacterErrorRateTest for the spec");
     }
 }

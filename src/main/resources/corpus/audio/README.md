@@ -5,7 +5,7 @@ Source recordings, one per clip, named `<clip-id>.wav` (e.g.
 `../transcripts/<clip-id>.txt`.
 
 These are the unmodified inputs. The benchmark applies recipes to them to
-produce the variants under [`../../generated-audio/`](../../generated-audio/);
-it never transforms files in place here.
+produce the variants under `build/generated-audio/`; it never transforms files
+in place here.
 
 Placeholder directory — add your own clips.

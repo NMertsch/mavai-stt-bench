@@ -10,8 +10,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Initial benchmarking scaffold for evaluating Speech-to-Text (STT) services
   with PUnit.
-- Repository layout: `corpus/`, `recipes/`, `generated-audio/`, `providers/`,
-  `contracts/`, `results/`, `reports/`.
+- Repository layout: corpus and recipes under `src/main/resources/`
+  (`corpus/`, `recipes/`); `providers/`, `contracts/`, `results/` at the root.
+  Generated audio defaults to `build/generated-audio/` and reports to
+  `build/reports/stt/` (ephemeral, per Gradle convention; generated-audio
+  redirectable via `-Psttbench.generatedAudioDir`).
 - Recipe model (`Recipe`, `RecipeStep`, `RecipeLoader`) and four bundled
   recipes: `clean`, `telephone-bandwidth`, `cafe-light`, `cafe-heavy`.
 - Provider abstraction (`SttProvider`, `SttRequest`, `SttResponse`) with a

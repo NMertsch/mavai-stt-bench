@@ -1,7 +1,5 @@
 package org.mavai.sttbench.eval;
 
-import java.util.List;
-
 /**
  * Word Error Rate (WER): edit distance between reference and hypothesis word
  * sequences, divided by the number of reference words.
@@ -10,11 +8,16 @@ import java.util.List;
  * substitutions, insertions, and deletions. Lower is better; {@code 0.0}
  * means a perfect match after normalisation.
  *
- * <p><strong>Skeletal.</strong> The Levenshtein distance below is correct
- * but unoptimised, and the metric does not yet break the score down into
- * substitution / insertion / deletion components (which a real STT report
- * wants). Both are natural Hackergarten extensions. Inputs are normalised
- * via {@link TranscriptNormaliser} before scoring.
+ * <p><strong>Not implemented yet — this is a Hackergarten task.</strong> The
+ * behaviour you are implementing towards is pinned by the (currently
+ * {@code @Disabled}) spec in {@code WordErrorRateTest}. Enable that test, then
+ * make it green. A worked example of the static-util, normalise-then-score
+ * shape lives in {@link TranscriptNormaliser} — copy its pattern.
+ *
+ * <p>The shape: tokenise both sides through {@link TranscriptNormaliser},
+ * compute the word-level Levenshtein (edit) distance, and divide by the
+ * reference word count. A simple full-matrix Levenshtein is fine to start; a
+ * substitution / insertion / deletion breakdown is a natural follow-up.
  */
 public final class WordErrorRate {
 
@@ -24,47 +27,18 @@ public final class WordErrorRate {
     /**
      * Computes WER of {@code hypothesis} against {@code reference}.
      *
+     * <p>Contract the spec test asserts: {@code 0.0} for a perfect match (after
+     * normalisation), {@code 0.0} when both sides normalise to empty, and
+     * {@code 1.0} when the reference is empty but the hypothesis is not. A
+     * single word substitution, insertion, or deletion against an
+     * {@code n}-word reference scores {@code 1.0 / n}.
+     *
      * @param reference  the ground-truth transcript
      * @param hypothesis the provider's transcript
-     * @return the WER in {@code [0, ∞)}; {@code 0.0} for a perfect match,
-     *     and {@code 0.0} when both normalise to empty
+     * @return the WER in {@code [0, ∞)}; {@code 0.0} for a perfect match
      */
     public static double compute(String reference, String hypothesis) {
-        List<String> ref = tokenise(reference);
-        List<String> hyp = tokenise(hypothesis);
-        if (ref.isEmpty()) {
-            return hyp.isEmpty() ? 0.0 : 1.0;
-        }
-        int distance = levenshtein(ref, hyp);
-        return (double) distance / ref.size();
-    }
-
-    private static List<String> tokenise(String text) {
-        String normalised = TranscriptNormaliser.normalise(text);
-        if (normalised.isEmpty()) {
-            return List.of();
-        }
-        return List.of(normalised.split(" "));
-    }
-
-    // Skeletal full-matrix Levenshtein. TODO(hackergarten): two-row space
-    // optimisation and S/I/D breakdown.
-    private static int levenshtein(List<String> a, List<String> b) {
-        int[][] d = new int[a.size() + 1][b.size() + 1];
-        for (int i = 0; i <= a.size(); i++) {
-            d[i][0] = i;
-        }
-        for (int j = 0; j <= b.size(); j++) {
-            d[0][j] = j;
-        }
-        for (int i = 1; i <= a.size(); i++) {
-            for (int j = 1; j <= b.size(); j++) {
-                int cost = a.get(i - 1).equals(b.get(j - 1)) ? 0 : 1;
-                d[i][j] = Math.min(
-                        Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1),
-                        d[i - 1][j - 1] + cost);
-            }
-        }
-        return d[a.size()][b.size()];
+        throw new UnsupportedOperationException(
+                "Hackergarten: implement Word Error Rate — see WordErrorRateTest for the spec");
     }
 }

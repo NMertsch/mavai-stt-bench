@@ -47,8 +47,11 @@ over each provider, and consolidates the results into an STT comparison report.
 ## 4. The pipeline: Audio → Recipe → STT → PUnit → Report
 
 ```
-corpus/            recipes/              generated-audio/
- audio + transcripts  +  degradations  →   corpus × recipe
+ corpus (audio + transcripts)         recipes (degradations)
+ src/main/resources/corpus/           src/main/resources/recipes/
+        │                                        │
+        │                                        ▼
+        │                    generate ──►  build/generated-audio/   (corpus × recipe)
         │                                        │
         │                                        ▼
         │                              providers/  (SttProvider)
@@ -59,20 +62,46 @@ corpus/            recipes/              generated-audio/
                                        results/explore/*.json
                                                  │  consolidate
                                                  ▼
-                                  reports/  (HTML + Markdown)
+                            build/reports/stt/  (HTML + Markdown)
 ```
 
 Driven by three Gradle tasks:
 
 ```bash
-./gradlew generateAudioVariants   # corpus × recipe  -> generated-audio/
+./gradlew generateAudioVariants   # corpus × recipe  -> build/generated-audio/
 ./gradlew runSttBenchmark         # PUnit explore     -> results/explore/
-./gradlew generateSttReport       # explore results   -> reports/
+./gradlew generateSttReport       # explore results   -> build/reports/stt/
 ```
 
 These tasks are **placeholders** in this scaffold — they describe what they
 will do and point at the extension point. Implementing them is the headline
 Hackergarten task.
+
+### Persisting generated audio (efficiency & audit)
+
+Generated audio defaults to `build/generated-audio/` — ephemeral, derived
+output per Gradle convention, wiped by `clean`. Two reasons a fork might want
+it to survive:
+
+- **Efficiency.** Audio synthesis is costly. The right fix is *incremental
+  build*: declare the corpus and recipes as `generateAudioVariants` inputs and
+  `build/generated-audio/` as its output, so Gradle skips regeneration when
+  nothing changed. That holds even under `build/` — only `clean` forces a
+  rebuild.
+- **Audit / history.** Where a verdict must be reproducible or attestable
+  later, the durable record is **provenance**, not the audio's location: record
+  the content hashes of the corpus and recipe definitions, the transform tool
+  versions, and a run id alongside the explore results. That makes a past
+  verdict reconstructible without committing large binaries. If a regime
+  additionally requires retaining the exact audio bytes, redirect the output to
+  a kept (or externally archived) location rather than relying on `build/`:
+
+  ```bash
+  ./gradlew generateAudioVariants -Psttbench.generatedAudioDir=artefacts/audio
+  ```
+
+Both the provenance manifest and the archival step are deliberate extension
+points, not yet implemented.
 
 ## 5. How to add a corpus
 
@@ -80,14 +109,14 @@ The corpus is the ground truth. For each clip, add a recording and the exact
 text that was read:
 
 ```
-corpus/audio/shopping_001.wav        # recording
-corpus/transcripts/shopping_001.txt  # text that was read (reference)
+src/main/resources/corpus/audio/shopping_001.wav        # recording
+src/main/resources/corpus/transcripts/shopping_001.txt  # text that was read
 ```
 
 Match the stems (`shopping_001`). Casing and punctuation in the transcript do
 not need a particular convention — both reference and hypothesis are normalised
 before scoring (`org.mavai.sttbench.eval.TranscriptNormaliser`). See
-[`corpus/README.md`](corpus/README.md).
+[`src/main/resources/corpus/README.md`](src/main/resources/corpus/README.md).
 
 ## 6. How to add a recipe
 
@@ -106,7 +135,8 @@ steps:
     sampleRateHz: 8000
 ```
 
-Drop a `*.yml` file in [`recipes/`](recipes/). Four are bundled: `clean`,
+Drop a `*.yml` file in
+[`src/main/resources/recipes/`](src/main/resources/recipes/). Four are bundled: `clean`,
 `telephone-bandwidth`, `cafe-light`, `cafe-heavy`. The recipe **model** parses
 your file (`org.mavai.sttbench.recipe.*`); the **engine** that executes the
 steps is the gap `generateAudioVariants` fills.

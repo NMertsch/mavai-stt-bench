@@ -13,7 +13,7 @@ class NoopSttProviderTest {
     void returnsOkWithCannedTranscript() {
         SttProvider provider = new NoopSttProvider("add two apples");
         SttRequest request = new SttRequest(
-                "shopping_001", "clean", Path.of("generated-audio/clean/shopping_001.wav"), "en-GB");
+                "shopping_001", "clean", Path.of("build/generated-audio/clean/shopping_001.wav"), "en-GB");
 
         Outcome<SttResponse> outcome = provider.transcribe(request);
 

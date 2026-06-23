@@ -5,17 +5,19 @@ import static org.mavai.punit.api.criterion.Criteria.of;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Supplier;
 import org.mavai.outcome.Outcome;
+import org.mavai.punit.api.Expected;
+import org.mavai.punit.api.PercentileKey;
 import org.mavai.punit.api.ServiceContract;
 import org.mavai.punit.api.TokenTracker;
 import org.mavai.punit.api.covariate.Covariate;
 import org.mavai.punit.api.covariate.CovariateCategory;
 import org.mavai.punit.api.criterion.Criteria;
-import org.mavai.sttbench.eval.CharacterErrorRate;
-import org.mavai.sttbench.eval.TokenF1;
+import org.mavai.punit.api.criterion.LatencyCriterion;
+import org.mavai.punit.api.criterion.ValueMatcher;
 import org.mavai.sttbench.eval.TranscriptNormaliser;
-import org.mavai.sttbench.eval.WordErrorRate;
 import org.mavai.sttbench.provider.SttProvider;
 import org.mavai.sttbench.provider.SttRequest;
 import org.mavai.sttbench.provider.SttResponse;
@@ -25,133 +27,119 @@ import org.mavai.sttbench.provider.SttResponse;
  *
  * <p>This is the single, opinionated contract every provider is judged
  * against. It is deliberately not generic: the criteria below encode what it
- * means for an STT system to transcribe well, expressed as PUnit pass-rate
- * criteria so the engine can derive statistical verdicts across many clips
- * and recipes.
+ * means for an STT system to transcribe well, expressed only as claims PUnit
+ * can evaluate <em>soundly</em> across many clips and recipes.
  *
- * <p><strong>Factor record.</strong> {@link SttTuning} carries the thresholds
- * the contract judges against. Varying the tuning (e.g. tightening the WER
- * threshold) is how an experiment sweeps acceptance strictness.
+ * <p><strong>Only inferentially-sound claims are judged.</strong> Each
+ * postcondition reduces a sample to a genuine pass/fail with a principled
+ * boundary, so the engine's pass-rate-with-confidence-interval machinery
+ * applies honestly:
+ * <ul>
+ *   <li><em>non-empty transcript</em> — the provider returned usable text;</li>
+ *   <li><em>normalised exact match</em> — a Bernoulli outcome whose threshold
+ *       (zero errors) is principled, not guessed.</li>
+ * </ul>
+ * The one continuous dimension judged here is <em>latency</em>, via the
+ * sibling {@link #latency()} percentile criterion — a per-request quantity
+ * whose distribution tail PUnit bounds soundly, and whose threshold is
+ * <em>derived</em> from an empirical baseline rather than imposed up front.
  *
- * <p><strong>Input / output.</strong> The input is an {@link SttRequest}
- * (one audio clip, possibly recipe-transformed). The output value the engine
- * judges is the raw transcript {@code String} the provider returned.
+ * <p><strong>WER, CER and Token F1 are deliberately not judged here.</strong>
+ * They are continuous accuracy metrics that PUnit cannot yet characterise
+ * inferentially: per-clip they are heteroscedastic, segmentation-dependent
+ * rates (WER/CER) or a non-poolable score (Token F1), and the pooled-rate
+ * machinery they need does not exist in the family today. Collapsing them to
+ * pass/fail at a hand-guessed threshold (the old {@code maxWer = 0.30}) would
+ * teach the very anti-pattern this project exists to discourage. They survive
+ * as <em>descriptive, unjudged</em> report columns computed by
+ * {@code runSttBenchmark} (see
+ * {@link org.mavai.sttbench.report.ExploreResult}), not as contract criteria.
+ * Background: the orchestrator follow-up note
+ * {@code stt-metric-characterisation-and-pooled-rate-archetype}.
  *
- * <p><strong>Reference transcripts</strong> are the ground truth: the text
- * originally read to record the corpus clip. They are resolved per clip and
- * compared against the provider's transcript under
- * {@link TranscriptNormaliser normalisation}. The contract scores literal
- * token / word / character overlap — never semantic or cosine similarity —
- * because STT systems are expected to transcribe, not paraphrase.
+ * <p><strong>Factor record.</strong> {@link SttTuning} carries the latency
+ * percentile the contract asserts against (default P95). Varying it is how an
+ * experiment sweeps which point of the latency distribution it commits to.
+ *
+ * <p><strong>Reference transcripts as ground truth.</strong> The reference is
+ * the text originally read to record the corpus clip. It travels on the
+ * per-sample input: {@link AudioSample} implements {@link Expected}{@code
+ * <String>}, so the engine reads {@link AudioSample#expected()} once per
+ * sample and routes it — alongside the provider's transcript — to each
+ * reference-bearing criterion's {@link ValueMatcher}. There is no shared
+ * mutable state and no synthetic wrapper on the output type, which stays a
+ * plain {@code String}.
+ *
+ * <p>The reference is carried on the sample but never passed to the provider,
+ * so a provider cannot read the answer it is being judged against. Scoring is
+ * literal — judged exact match, and the descriptive WER/CER/Token-F1 columns —
+ * under {@link TranscriptNormaliser normalisation}, never semantic or cosine
+ * similarity, because STT systems transcribe, not paraphrase.
  *
  * <p>The provider is a {@link CovariateCategory#CONFIGURATION} covariate, so
  * a baseline measured under one provider can never silently match a test run
  * under another.
  *
- * <p><strong>Skeletal.</strong> Reference resolution is provided by a
- * {@code referenceResolver} closure; the corpus-loading wiring that supplies
- * it end-to-end is a Hackergarten extension point (see
- * {@code runSttBenchmark}). The criteria set is complete enough to be
- * meaningful and intentionally leaves keyword-retention criteria out by
- * design.
+ * <p><strong>Skeletal.</strong> The corpus-loading wiring that builds the
+ * {@link AudioSample} inputs (each request paired with its resolved reference)
+ * is a Hackergarten extension point (see {@code runSttBenchmark}). The criteria
+ * set is complete enough to be meaningful and intentionally leaves
+ * keyword-retention criteria out by design. Computing the descriptive
+ * WER/CER/Token-F1 columns (judged by nothing, observed for the report) is the
+ * companion Hackergarten task on the reporting side.
  */
 public final class SttServiceContract
-        implements ServiceContract<SttServiceContract.SttTuning, SttRequest, String> {
+        implements ServiceContract<SttServiceContract.SttTuning, SttServiceContract.AudioSample, String> {
 
     private final SttProvider provider;
     private final SttTuning tuning;
-    private final ReferenceResolver references;
 
-    /**
-     * Resolves the ground-truth reference transcript for a request's clip.
-     * A real implementation reads {@code corpus/transcripts/<clipId>.txt}.
-     */
-    @FunctionalInterface
-    public interface ReferenceResolver {
-        /**
-         * @param request the request whose clip's reference is wanted
-         * @return the reference transcript text, or {@code null} if none exists
-         */
-        String referenceFor(SttRequest request);
-    }
-
-    public SttServiceContract(SttProvider provider, SttTuning tuning, ReferenceResolver references) {
-        this.provider = provider;
-        this.tuning = tuning;
-        this.references = references;
+    public SttServiceContract(SttProvider provider, SttTuning tuning) {
+        this.provider = Objects.requireNonNull(provider, "provider");
+        this.tuning = Objects.requireNonNull(tuning, "tuning");
     }
 
     @Override
     public Criteria<String> criteria() {
         return of(
+                // Reference-free: needs only the produced transcript. A genuine
+                // Bernoulli — the provider either returned usable text or not.
                 empirical().<String>passRate()
                         .name("non-empty-transcript")
-                        .satisfies("Transcript is non-empty",
-                                this::checkNonEmpty),
+                        .satisfies("Transcript is non-empty", this::checkNonEmpty),
+
+                // Reference-bearing: the framework supplies (expected, actual)
+                // from the sample's Expected#expected() and the invoke output.
+                // Exact match is the one accuracy outcome with a principled,
+                // un-guessed boundary (zero errors), so its pass rate is sound.
                 empirical().<String>passRate()
                         .name("normalised-exact-match")
-                        .satisfies("Normalised transcript exactly matches reference",
-                                this::checkExactMatch),
-                empirical().<String>passRate()
-                        .name("wer-below-threshold")
-                        .satisfies("Word Error Rate below threshold",
-                                this::checkWer),
-                empirical().<String>passRate()
-                        .name("cer-below-threshold")
-                        .satisfies("Character Error Rate below threshold",
-                                this::checkCer),
-                empirical().<String>passRate()
-                        .name("token-f1-above-threshold")
-                        .satisfies("Token F1 above threshold",
-                                this::checkTokenF1));
+                        .matchedBy(ExactMatcher::new));
+        // WER/CER/Token-F1 are deliberately absent: see the class javadoc. They
+        // are observed as descriptive report columns, never judged here.
+    }
+
+    /**
+     * The contract's inferential continuous dimension: an empirical latency
+     * percentile. Latency is a per-request quantity whose distribution tail
+     * PUnit bounds soundly (distribution-free order statistic), and the
+     * empirical form <em>derives</em> the bound at the asserted percentile from
+     * a measured baseline — the observe-then-derive loop, no guessed number.
+     *
+     * <p>If a fixed SLA is known up front, the contractual form
+     * ({@code meeting().atMost(percentile, Duration)}) is the alternative.
+     *
+     * @return the empirical latency criterion at {@link SttTuning#latencyPercentile()}
+     */
+    @Override
+    public LatencyCriterion latency() {
+        return empirical().atMost(tuning.latencyPercentile());
     }
 
     private Outcome<Void> checkNonEmpty(String transcript) {
         return TranscriptNormaliser.normalise(transcript).isEmpty()
                 ? Outcome.fail("empty-transcript", "Provider returned an empty transcript")
                 : Outcome.ok();
-    }
-
-    private Outcome<Void> checkExactMatch(String transcript) {
-        // NOTE: the reference is resolved from the most recent invoke via the
-        // resolver bound at construction. Wiring the per-sample input through
-        // to the criterion is a Hackergarten extension; until then this scores
-        // against the resolver's clip-independent reference.
-        String reference = TranscriptNormaliser.normalise(currentReference());
-        String hypothesis = TranscriptNormaliser.normalise(transcript);
-        return reference.equals(hypothesis)
-                ? Outcome.ok()
-                : Outcome.fail("no-exact-match", "Normalised transcript does not match reference");
-    }
-
-    private Outcome<Void> checkWer(String transcript) {
-        double wer = WordErrorRate.compute(currentReference(), transcript);
-        return wer <= tuning.maxWer()
-                ? Outcome.ok()
-                : Outcome.fail("wer-too-high", "WER %.3f exceeds %.3f".formatted(wer, tuning.maxWer()));
-    }
-
-    private Outcome<Void> checkCer(String transcript) {
-        double cer = CharacterErrorRate.compute(currentReference(), transcript);
-        return cer <= tuning.maxCer()
-                ? Outcome.ok()
-                : Outcome.fail("cer-too-high", "CER %.3f exceeds %.3f".formatted(cer, tuning.maxCer()));
-    }
-
-    private Outcome<Void> checkTokenF1(String transcript) {
-        double f1 = TokenF1.compute(currentReference(), transcript);
-        return f1 >= tuning.minTokenF1()
-                ? Outcome.ok()
-                : Outcome.fail("token-f1-too-low", "Token F1 %.3f below %.3f".formatted(f1, tuning.minTokenF1()));
-    }
-
-    // Skeletal: a single reference held from the last invoke. Replacing this
-    // with per-sample reference plumbing is a meaningful contributor task.
-    private volatile SttRequest lastRequest;
-
-    private String currentReference() {
-        String reference = lastRequest == null ? null : references.referenceFor(lastRequest);
-        return reference == null ? "" : reference;
     }
 
     @Override
@@ -170,22 +158,76 @@ public final class SttServiceContract
     }
 
     @Override
-    public Outcome<String> invoke(SttRequest request, TokenTracker tracker) {
-        this.lastRequest = request;
-        Outcome<SttResponse> response = provider.transcribe(request);
+    public Outcome<String> invoke(AudioSample sample, TokenTracker tracker) {
+        Outcome<SttResponse> response = provider.transcribe(sample.request());
         return response.map(SttResponse::transcript);
     }
 
     /**
-     * Acceptance thresholds the contract judges against.
+     * Per-sample input: the provider-facing {@link SttRequest} paired with the
+     * ground-truth reference transcript.
      *
-     * @param maxWer     maximum tolerated Word Error Rate
-     * @param maxCer     maximum tolerated Character Error Rate
-     * @param minTokenF1 minimum required Token F1
+     * <p>Implements {@link Expected}{@code <String>} so the framework routes
+     * {@link #expected()} to each reference-bearing criterion's
+     * {@link ValueMatcher} on every sample. The reference is exposed here but
+     * never passed to the provider — {@link #invoke} hands the provider only
+     * {@link #request()} — so a provider cannot read the answer it is judged
+     * against.
+     *
+     * @param request   the provider-facing request (clip, recipe, audio path)
+     * @param reference the ground-truth transcript read to record the clip
      */
-    public record SttTuning(double maxWer, double maxCer, double minTokenF1) {
+    public record AudioSample(SttRequest request, String reference) implements Expected<String> {
 
-        /** A lenient default suitable for the scaffold's noop provider. */
-        public static final SttTuning DEFAULT = new SttTuning(0.30, 0.20, 0.70);
+        public AudioSample {
+            Objects.requireNonNull(request, "request");
+            Objects.requireNonNull(reference, "reference");
+        }
+
+        @Override
+        public String expected() {
+            return reference;
+        }
+    }
+
+    // ── Value matcher: (expected reference, actual transcript) -> Outcome ──
+    // The eval metric normalises internally; its compute(reference, hypothesis)
+    // signature maps directly onto the matcher's (expected, actual) pair.
+    //
+    // Only exact match lives here. WER/CER/Token-F1 matchers were removed: they
+    // collapsed a continuous, inferentially-intractable metric to pass/fail at a
+    // guessed threshold. Those metrics are now computed descriptively on the
+    // reporting side (see the class javadoc and the orchestrator follow-up note).
+
+    private record ExactMatcher() implements ValueMatcher<String> {
+        @Override
+        public Outcome<Void> match(String expected, String actual) {
+            return TranscriptNormaliser.normalise(expected)
+                    .equals(TranscriptNormaliser.normalise(actual))
+                    ? Outcome.ok()
+                    : Outcome.fail("no-exact-match",
+                            "Normalised transcript does not match reference");
+        }
+    }
+
+    /**
+     * The contract's tuning surface. Holds the percentile at which the
+     * empirical {@link #latency()} criterion is asserted; the proportion
+     * criteria need no tuning (their boundaries are principled, not chosen).
+     *
+     * <p>No accuracy thresholds live here any more — the former
+     * {@code maxWer}/{@code maxCer}/{@code minTokenF1} were guessed acceptance
+     * limits on metrics PUnit cannot yet judge soundly, and have been removed.
+     *
+     * @param latencyPercentile the percentile the latency commitment is made at
+     */
+    public record SttTuning(PercentileKey latencyPercentile) {
+
+        public SttTuning {
+            Objects.requireNonNull(latencyPercentile, "latencyPercentile");
+        }
+
+        /** A sensible default: commit at the 95th latency percentile. */
+        public static final SttTuning DEFAULT = new SttTuning(PercentileKey.P95);
     }
 }

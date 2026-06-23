@@ -46,17 +46,16 @@ bin/
 .claude/settings.local.json
 
 ### STT benchmark — generated / derived artefacts ###
-# Generated audio is reproducible from corpus × recipes.
-/generated-audio/**
-!/generated-audio/README.md
+# Generated audio defaults to build/generated-audio/ (already covered by
+# build/ above). A fork may redirect it to a persistent path via
+# -Psttbench.generatedAudioDir=… — ignore that path here if it lives in-tree.
 # PUnit explore results are reproducible from the benchmark run.
 /results/**
 !/results/README.md
 !/results/explore/
 !/results/explore/README.md
-# Reports are reproducible from the results.
-/reports/**
-!/reports/README.md
+# Reports land under build/reports/stt/ (already covered by build/ above) —
+# ephemeral, derived output per Gradle convention, never tracked at the root.
 
 ### Secrets / API keys ###
 # Never commit provider credentials.
