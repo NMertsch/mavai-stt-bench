@@ -2,20 +2,17 @@ package org.mavai.sttbench.contract;
 
 import static org.mavai.punit.api.criterion.Criteria.empirical;
 import static org.mavai.punit.api.criterion.Criteria.of;
-
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
 import org.mavai.outcome.Outcome;
 import org.mavai.punit.api.Expected;
-import org.mavai.punit.api.PercentileKey;
 import org.mavai.punit.api.ServiceContract;
 import org.mavai.punit.api.TokenTracker;
 import org.mavai.punit.api.covariate.Covariate;
 import org.mavai.punit.api.covariate.CovariateCategory;
 import org.mavai.punit.api.criterion.Criteria;
-import org.mavai.punit.api.criterion.LatencyCriterion;
 import org.mavai.punit.api.criterion.ValueMatcher;
 import org.mavai.sttbench.eval.TranscriptNormaliser;
 import org.mavai.sttbench.provider.SttProvider;
@@ -57,10 +54,6 @@ import org.mavai.sttbench.provider.SttResponse;
  * Background: the orchestrator follow-up note
  * {@code stt-metric-characterisation-and-pooled-rate-archetype}.
  *
- * <p><strong>Factor record.</strong> {@link SttTuning} carries the latency
- * percentile the contract asserts against (default P95). Varying it is how an
- * experiment sweeps which point of the latency distribution it commits to.
- *
  * <p><strong>Reference transcripts as ground truth.</strong> The reference is
  * the text originally read to record the corpus clip. It travels on the
  * per-sample input: {@link AudioSample} implements {@link Expected}{@code
@@ -89,14 +82,12 @@ import org.mavai.sttbench.provider.SttResponse;
  * companion Hackergarten task on the reporting side.
  */
 public final class SttServiceContract
-        implements ServiceContract<SttServiceContract.SttTuning, SttServiceContract.AudioSample, String> {
+        implements ServiceContract<SttProvider, SttServiceContract.AudioSample, String> {
 
     private final SttProvider provider;
-    private final SttTuning tuning;
 
-    public SttServiceContract(SttProvider provider, SttTuning tuning) {
+    public SttServiceContract(SttProvider provider) {
         this.provider = Objects.requireNonNull(provider, "provider");
-        this.tuning = Objects.requireNonNull(tuning, "tuning");
     }
 
     @Override
@@ -119,22 +110,6 @@ public final class SttServiceContract
         // are observed as descriptive report columns, never judged here.
     }
 
-    /**
-     * The contract's inferential continuous dimension: an empirical latency
-     * percentile. Latency is a per-request quantity whose distribution tail
-     * PUnit bounds soundly (distribution-free order statistic), and the
-     * empirical form <em>derives</em> the bound at the asserted percentile from
-     * a measured baseline — the observe-then-derive loop, no guessed number.
-     *
-     * <p>If a fixed SLA is known up front, the contractual form
-     * ({@code meeting().atMost(percentile, Duration)}) is the alternative.
-     *
-     * @return the empirical latency criterion at {@link SttTuning#latencyPercentile()}
-     */
-    @Override
-    public LatencyCriterion latency() {
-        return empirical().atMost(tuning.latencyPercentile());
-    }
 
     private Outcome<Void> checkNonEmpty(String transcript) {
         return TranscriptNormaliser.normalise(transcript).isEmpty()
@@ -210,24 +185,4 @@ public final class SttServiceContract
         }
     }
 
-    /**
-     * The contract's tuning surface. Holds the percentile at which the
-     * empirical {@link #latency()} criterion is asserted; the proportion
-     * criteria need no tuning (their boundaries are principled, not chosen).
-     *
-     * <p>No accuracy thresholds live here any more — the former
-     * {@code maxWer}/{@code maxCer}/{@code minTokenF1} were guessed acceptance
-     * limits on metrics PUnit cannot yet judge soundly, and have been removed.
-     *
-     * @param latencyPercentile the percentile the latency commitment is made at
-     */
-    public record SttTuning(PercentileKey latencyPercentile) {
-
-        public SttTuning {
-            Objects.requireNonNull(latencyPercentile, "latencyPercentile");
-        }
-
-        /** A sensible default: commit at the 95th latency percentile. */
-        public static final SttTuning DEFAULT = new SttTuning(PercentileKey.P95);
-    }
 }
